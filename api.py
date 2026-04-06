@@ -127,7 +127,7 @@ Run all triage tools once you have the information. Use simple clear language.""
 
 # ── Model and agent ───────────────────────────────────────────────────────────
 
-llm = ChatAnthropic(model="claude-sonnet-4-6", temperature=0.3)
+llm = ChatAnthropic(model="claude-sonnet-4-6", temperature=0.8)
 memory = MemorySaver()
 agent = create_react_agent(llm, tools, checkpointer=memory, prompt=SYSTEM_PROMPT)
 
