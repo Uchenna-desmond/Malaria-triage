@@ -1,5 +1,9 @@
 import os
-import hashlib
+from dotenv import load_dotenv
+
+# Works locally (reads .env file) and on Render (reads environment variables)
+load_dotenv()
+
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -10,9 +14,7 @@ from langchain_community.tools import WikipediaQueryRun, PubmedQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
-
-os.environ["ANTHROPIC_API_KEY"] = "your-api-key-here"
-
+import hashlib
 # ── Tools ─────────────────────────────────────────────────────────────────────
 
 @tool
@@ -163,17 +165,19 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, chw_name: str = Depends(verify_api_key)):
-    config = {"configurable": {"thread_id": request.session_id}}
-    result = agent.invoke(
-        {"messages": [HumanMessage(content=request.message)]},
-        config=config,
-    )
-    return ChatResponse(
-        response=result["messages"][-1].content,
-        session_id=request.session_id,
-        chw_name=chw_name,
-    )
-
+    try:
+        config = {"configurable": {"thread_id": request.session_id}}
+        result = agent.invoke(
+            {"messages": [HumanMessage(content=request.message)]},
+            config=config,
+        )
+        return ChatResponse(
+            response=result["messages"][-1].content,
+            session_id=request.session_id,
+            chw_name=chw_name,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.post("/register")
 def register_chw(name: str, region: str, admin_password: str):
     if admin_password != os.environ.get("ADMIN_PASSWORD", "changeme"):
