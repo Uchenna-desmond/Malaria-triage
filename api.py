@@ -15,6 +15,8 @@ from langchain_community.utilities import WikipediaAPIWrapper
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 import hashlib
+from twilio.rest import Client
+from fastapi import Request
 # ── Tools ─────────────────────────────────────────────────────────────────────
 
 @tool
@@ -185,6 +187,35 @@ def register_chw(name: str, region: str, admin_password: str):
     new_key = hashlib.sha256(f"{name}{region}".encode()).hexdigest()[:20]
     REGISTERED_KEYS[new_key] = f"{name} - {region}"
     return {"api_key": new_key, "chw": f"{name} - {region}"}
+twilio_client = Client(
+    os.environ.get("TWILIO_ACCOUNT_SID"),
+    os.environ.get("TWILIO_AUTH_TOKEN"),
+)
+TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
+
+@app.post("/whatsapp")
+async def whatsapp_webhook(request: Request):
+    form = await request.form()
+    incoming_message = form.get("Body", "").strip()
+    sender_number = form.get("From", "")
+    session_id = sender_number.replace("whatsapp:", "").replace("+", "")
+
+    config = {"configurable": {"thread_id": session_id}}
+    try:
+        result = agent.invoke(
+            {"messages": [HumanMessage(content=incoming_message)]},
+            config=config,
+        )
+        reply = result["messages"][-1].content[:1500]
+    except Exception as e:
+        reply = f"Sorry, an error occurred: {str(e)}"
+
+    twilio_client.messages.create(
+        body=reply,
+        from_=TWILIO_WHATSAPP_NUMBER,
+        to=sender_number,
+    )
+    return {"status": "message sent"}
 
 @app.get("/health")
 def health():
